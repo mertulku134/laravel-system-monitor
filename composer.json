@@ -1,0 +1,49 @@
+{
+  "name": "aoux/system-monitor",
+  "description": "Laravel uygulamanızın cache, queue, redis ve sistem kaynaklarını izlemek için geliştirilmiş bir paket",
+  "type": "library",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Mert Ülkü",
+      "email": "mertulku134@hotmail.com"
+    }
+  ],
+  "homepage": "https://github.com/KULLANICI_ADINIZ/system-monitor",
+  "keywords": [
+    "laravel",
+    "monitor",
+    "cache",
+    "queue",
+    "redis",
+    "system",
+    "performance"
+  ],
+  "require": {
+    "php": "^8.0",
+    "laravel/framework": "^9.0|^10.0"
+  },
+  "require-dev": {
+    "orchestra/testbench": "^7.0|^8.0",
+    "phpunit/phpunit": "^9.0|^10.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "Aoux\\SystemMonitor\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Aoux\\SystemMonitor\\Tests\\": "tests/"
+    }
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "Aoux\\SystemMonitor\\SystemMonitorServiceProvider"
+      ]
+    }
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true
+}
