@@ -1,37 +1,53 @@
 # Laravel System Monitor
 
-Laravel uygulamalarınız için gelişmiş sistem izleme paketi. Cache, Queue, Redis, sistem kaynakları ve kullanıcı aktivitelerini izlemenizi sağlar.
+Advanced system monitoring package for Laravel applications. Monitors Cache, Queue, Redis, system resources, and user activities.
 
-## Özellikler
+## Features
 
-- Cache sistemi izleme
-- Queue sistemi izleme
-- Redis sistemi izleme
-- Sistem kaynakları izleme (CPU, RAM, Disk)
-- Kullanıcı aktivite izleme
-- Özelleştirilebilir arayüz
-- Güvenlik kontrolleri
-- Detaylı loglama
+- Cache system monitoring
+- Queue system monitoring
+- Redis system monitoring
+- System resources monitoring (CPU, RAM, Disk)
+- User activity monitoring
+- Customizable interface
+- Security checks
+- Detailed logging
 
-## Kurulum
+## Installation
 
 ```bash
 composer require aoux/system-monitor
 ```
 
-## Yapılandırma
+## Configuration
 
-Paketi yükledikten sonra, yapılandırma dosyasını yayınlayın:
+After installing the package, publish the configuration file:
 
 ```bash
 php artisan vendor:publish --provider="Aoux\SystemMonitor\SystemMonitorServiceProvider"
 ```
 
-## Kullanım
+You can also publish specific files using the following commands:
 
-### View Oluşturma
+```bash
+# Publish only configuration file
+php artisan vendor:publish --tag=config
 
-Kendi view dosyanızı oluşturun:
+# Publish only view files
+php artisan vendor:publish --tag=views
+
+# Publish only migration files
+php artisan vendor:publish --tag=migrations
+
+# Publish all files
+php artisan vendor:publish --tag=all
+```
+
+## Usage
+
+### Creating Views
+
+Create your own view file:
 
 ```php
 // resources/views/admin/monitor/index.blade.php
@@ -42,26 +58,26 @@ Kendi view dosyanızı oluşturun:
     <div class="system-monitor">
         @if(config('system-monitor.cache.enabled'))
             <div class="cache-status">
-                <h3>Cache Durumu</h3>
-                <p>Toplam Anahtar: {{ $cacheStatus['total_keys'] }}</p>
-                <p>Kullanılan Bellek: {{ $cacheStatus['memory_usage'] }}</p>
+                <h3>Cache Status</h3>
+                <p>Total Keys: {{ $cacheStatus['total_keys'] }}</p>
+                <p>Memory Usage: {{ $cacheStatus['memory_usage'] }}</p>
             </div>
         @endif
 
         @if(config('system-monitor.queue.enabled'))
             <div class="queue-status">
-                <h3>Queue Durumu</h3>
-                <p>Bekleyen İşler: {{ $queueStatus['pending_jobs'] }}</p>
-                <p>Başarısız İşler: {{ $queueStatus['failed_jobs'] }}</p>
+                <h3>Queue Status</h3>
+                <p>Pending Jobs: {{ $queueStatus['pending_jobs'] }}</p>
+                <p>Failed Jobs: {{ $queueStatus['failed_jobs'] }}</p>
             </div>
         @endif
     </div>
 @endsection
 ```
 
-### Route Erişimi
+### Route Access
 
-Sistem monitörüne erişmek için:
+To access the system monitor:
 
 ```php
 // routes/web.php
@@ -69,18 +85,18 @@ Route::get('/admin/monitor', [MonitorController::class, 'index'])
     ->name('admin.monitor.index');
 ```
 
-### Komut Satırı
+### Command Line
 
-Sistem durumunu komut satırından kontrol etmek için:
+To check system status from command line:
 
 ```bash
 php artisan system:monitor
 ```
 
-## Güvenlik
+## Security
 
-Güvenlik sorunlarını bildirmek için: mertsmulku@gmail.com
+To report security issues: mertsmulku@gmail.com
 
-## Lisans
+## License
 
 MIT 
