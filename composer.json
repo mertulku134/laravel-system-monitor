@@ -3,7 +3,7 @@
   "description": "Advanced system monitoring package for Laravel applications",
   "type": "library",
   "license": "MIT",
-  "version": "0.0.2",
+  "version": "0.0.4",
   "authors": [
     {
       "name": "Mert Ülkü",
