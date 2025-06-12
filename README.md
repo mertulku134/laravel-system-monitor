@@ -1,17 +1,17 @@
 # Laravel System Monitor
 
-Laravel uygulamanızın cache, queue, redis ve sistem kaynaklarını izlemek için geliştirilmiş bir paket.
+Laravel uygulamalarınız için gelişmiş sistem izleme paketi. Cache, Queue, Redis, sistem kaynakları ve kullanıcı aktivitelerini izlemenizi sağlar.
 
 ## Özellikler
 
 - Cache sistemi izleme
 - Queue sistemi izleme
 - Redis sistemi izleme
-- Sistem kaynakları izleme
+- Sistem kaynakları izleme (CPU, RAM, Disk)
 - Kullanıcı aktivite izleme
-- Modern ve kullanıcı dostu arayüz
-- Özelleştirilebilir izinler
-- Detaylı istatistikler
+- Özelleştirilebilir arayüz
+- Güvenlik kontrolleri
+- Detaylı loglama
 
 ## Kurulum
 
@@ -21,76 +21,66 @@ composer require aoux/system-monitor
 
 ## Yapılandırma
 
-Config dosyasını yayınlayın:
+Paketi yükledikten sonra, yapılandırma dosyasını yayınlayın:
 
 ```bash
-php artisan vendor:publish --tag=config
-```
-
-Assets dosyalarını yayınlayın:
-
-```bash
-php artisan vendor:publish --tag=assets
+php artisan vendor:publish --provider="Aoux\SystemMonitor\SystemMonitorServiceProvider"
 ```
 
 ## Kullanım
 
-1. `.env` dosyanızda gerekli ayarları yapın:
+### View Oluşturma
 
-```env
-SYSTEM_MONITOR_URL=system-monitor
-SYSTEM_MONITOR_MIDDLEWARE=web,auth
-SYSTEM_MONITOR_LAYOUT=layout.admin.master
-SYSTEM_MONITOR_VIEW=system-monitor::monitor
-```
-
-2. İzinleri yapılandırın:
+Kendi view dosyanızı oluşturun:
 
 ```php
-// config/admin_permissions.php
-[
-    'flag' => 'admin.system_monitor',
-    'icon' => 'fas fa-tachometer-alt',
-    'menuVisible' => true
-],
-[
-    'flag' => 'admin.system_monitor.index',
-    'parent_flag' => 'admin.system_monitor',
-    'menuVisible' => true
-],
-[
-    'flag' => 'admin.system_monitor.user_activity',
-    'parent_flag' => 'admin.system_monitor',
-    'menuVisible' => true
-]
+// resources/views/admin/monitor/index.blade.php
+
+@extends('layout.admin.master')
+
+@section('content')
+    <div class="system-monitor">
+        @if(config('system-monitor.cache.enabled'))
+            <div class="cache-status">
+                <h3>Cache Durumu</h3>
+                <p>Toplam Anahtar: {{ $cacheStatus['total_keys'] }}</p>
+                <p>Kullanılan Bellek: {{ $cacheStatus['memory_usage'] }}</p>
+            </div>
+        @endif
+
+        @if(config('system-monitor.queue.enabled'))
+            <div class="queue-status">
+                <h3>Queue Durumu</h3>
+                <p>Bekleyen İşler: {{ $queueStatus['pending_jobs'] }}</p>
+                <p>Başarısız İşler: {{ $queueStatus['failed_jobs'] }}</p>
+            </div>
+        @endif
+    </div>
+@endsection
 ```
 
-3. Sistemi izlemeye başlayın:
+### Route Erişimi
+
+Sistem monitörüne erişmek için:
 
 ```php
-use Aoux\SystemMonitor\Services\CacheMonitor;
-use Aoux\SystemMonitor\Services\QueueMonitor;
-use Aoux\SystemMonitor\Services\RedisMonitor;
-use Aoux\SystemMonitor\Services\SystemResourceMonitor;
-use Aoux\SystemMonitor\Services\UserActivityMonitor;
+// routes/web.php
+Route::get('/admin/monitor', [MonitorController::class, 'index'])
+    ->name('admin.monitor.index');
+```
 
-$cacheMonitor = new CacheMonitor();
-$queueMonitor = new QueueMonitor();
-$redisMonitor = new RedisMonitor();
-$systemMonitor = new SystemResourceMonitor();
-$userActivityMonitor = new UserActivityMonitor();
+### Komut Satırı
 
-$cacheStatus = $cacheMonitor->getStatus();
-$queueStatus = $queueMonitor->getStatus();
-$redisStatus = $redisMonitor->getStatus();
-$systemStatus = $systemMonitor->getStatus();
-$userActivityStatus = $userActivityMonitor->getStatus();
+Sistem durumunu komut satırından kontrol etmek için:
+
+```bash
+php artisan system:monitor
 ```
 
 ## Güvenlik
 
-Eğer güvenlik açıkları bulursanız, lütfen security@aoux.com adresine e-posta gönderin.
+Güvenlik sorunlarını bildirmek için: mertulkusmulku@gmail.com
 
 ## Lisans
 
-MIT lisansı altında lisanslanmıştır. Daha fazla bilgi için `LICENSE` dosyasına bakın. 
+MIT 
