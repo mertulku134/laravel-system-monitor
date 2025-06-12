@@ -34,7 +34,10 @@ class CacheMonitor
             'name' => $driver,
             'connection' => $connection['connection'] ?? null,
             'prefix' => $connection['prefix'] ?? '',
-            'ttl' => $connection['ttl'] ?? 60
+            'ttl' => $connection['ttl'] ?? 60,
+            'status' => $this->checkConnection(),
+            'memory_usage' => $this->getMemoryUsage(),
+            'keys_count' => $this->getTotalKeys(),
         ];
     }
 
