@@ -2,6 +2,7 @@
 namespace Aoux\SystemMonitor\Services;
 
 use Illuminate\Support\Facades\Redis;
+use Illuminate\Support\Facades\Config;
 
 class RedisMonitor
 {
@@ -38,6 +39,113 @@ class RedisMonitor
                 'error' => $e->getMessage()
             ];
         }
+    }
+
+    public function getInfo(): array
+    {
+        return [
+            'status' => $this->checkConnection(),
+            'connected_clients' => $this->getConnectedClients(),
+            'used_memory' => $this->getUsedMemory(),
+            'total_keys' => $this->getTotalKeys(),
+            'uptime' => $this->getUptime(),
+            'hit_rate' => $this->getHitRate()
+        ];
+    }
+
+    public function checkConnection(): bool
+    {
+        try {
+            Redis::ping();
+            return true;
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    public function getConnectedClients(): int
+    {
+        try {
+            $info = Redis::info();
+            return $info['connected_clients'] ?? 0;
+        } catch (\Exception $e) {
+            return 0;
+        }
+    }
+
+    public function getUsedMemory(): string
+    {
+        try {
+            $info = Redis::info();
+            $usedMemory = $info['used_memory'] ?? 0;
+            return $this->formatBytes($usedMemory);
+        } catch (\Exception $e) {
+            return '0 B';
+        }
+    }
+
+    public function getTotalKeys(): int
+    {
+        try {
+            return Redis::dbSize();
+        } catch (\Exception $e) {
+            return 0;
+        }
+    }
+
+    public function getUptime(): string
+    {
+        try {
+            $info = Redis::info();
+            $uptime = $info['uptime_in_seconds'] ?? 0;
+            return $this->formatUptime($uptime);
+        } catch (\Exception $e) {
+            return '0s';
+        }
+    }
+
+    public function getHitRate(): float
+    {
+        try {
+            $info = Redis::info();
+            $keyspaceHits = $info['keyspace_hits'] ?? 0;
+            $keyspaceMisses = $info['keyspace_misses'] ?? 0;
+            
+            if ($keyspaceHits + $keyspaceMisses === 0) {
+                return 0;
+            }
+            
+            return round(($keyspaceHits / ($keyspaceHits + $keyspaceMisses)) * 100, 2);
+        } catch (\Exception $e) {
+            return 0;
+        }
+    }
+
+    protected function formatBytes(int $bytes): string
+    {
+        $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        $bytes = max($bytes, 0);
+        $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
+        $pow = min($pow, count($units) - 1);
+        $bytes /= pow(1024, $pow);
+        
+        return round($bytes, 2) . ' ' . $units[$pow];
+    }
+
+    protected function formatUptime(int $seconds): string
+    {
+        $days = floor($seconds / 86400);
+        $hours = floor(($seconds % 86400) / 3600);
+        $minutes = floor(($seconds % 3600) / 60);
+        $seconds = $seconds % 60;
+        
+        $parts = [];
+        if ($days > 0) $parts[] = $days . 'd';
+        if ($hours > 0) $parts[] = $hours . 'h';
+        if ($minutes > 0) $parts[] = $minutes . 'm';
+        if ($seconds > 0 || empty($parts)) $parts[] = $seconds . 's';
+        
+        return implode(' ', $parts);
     }
 
     protected function getMemoryInfo($info)

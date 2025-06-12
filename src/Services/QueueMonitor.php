@@ -3,6 +3,7 @@ namespace Aoux\SystemMonitor\Services;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Config;
 
 class QueueMonitor
 {
@@ -13,118 +14,95 @@ class QueueMonitor
         $this->config = config('system-monitor.queue', []);
     }
 
-    public function getStatus()
+    public function getStatus(): array
     {
-        if (!$this->config['enabled']) {
-            return null;
-        }
-
         return [
-            'driver' => $this->getQueueDriver(),
-            'connection' => $this->getQueueConnection(),
+            'driver' => $this->getDriverInfo(),
+            'status' => $this->checkConnection(),
             'pending_jobs' => $this->getPendingJobsCount(),
-            'failed_jobs' => $this->getFailedJobsCount(),
-            'processed_jobs' => $this->getProcessedJobsCount(),
-            'retry_after' => $this->getRetryAfter(),
-            'timeout' => $this->getTimeout(),
-            'max_tries' => $this->getMaxTries(),
-            'failed_jobs_table' => $this->getFailedJobsTable(),
+            'failed_jobs' => $this->getFailedJobsCount()
         ];
     }
 
-    protected function getQueueDriver()
+    public function getDriverInfo(): array
     {
-        return config('queue.default', 'sync');
+        $driver = Config::get('queue.default');
+        $connection = Config::get('queue.connections.' . $driver);
+
+        return [
+            'name' => $driver,
+            'connection' => $connection['connection'] ?? null,
+            'queue' => $connection['queue'] ?? 'default',
+            'retry_after' => $connection['retry_after'] ?? 90,
+            'block_for' => $connection['block_for'] ?? null,
+            'after_commit' => $connection['after_commit'] ?? false
+        ];
     }
 
-    protected function getQueueConnection()
+    public function checkConnection(): bool
     {
-        return config('queue.connections.' . $this->getQueueDriver() . '.connection', 'default');
-    }
-
-    protected function getPendingJobsCount()
-    {
-        $driver = $this->getQueueDriver();
-        
-        if ($driver === 'database') {
-            return DB::table('jobs')->count();
-        } elseif ($driver === 'redis') {
-            return Queue::size('default');
-        }
-        
-        return 0;
-    }
-
-    protected function getFailedJobsCount()
-    {
-        return DB::table($this->getFailedJobsTable())->count();
-    }
-
-    protected function getProcessedJobsCount()
-    {
-        $driver = $this->getQueueDriver();
-        
-        if ($driver === 'database') {
-            return DB::table('jobs')
-                ->whereNotNull('reserved_at')
-                ->whereNotNull('completed_at')
-                ->count();
-        }
-        
-        return 0;
-    }
-
-    protected function getRetryAfter()
-    {
-        return config('queue.connections.' . $this->getQueueDriver() . '.retry_after', 90);
-    }
-
-    protected function getTimeout()
-    {
-        return config('queue.connections.' . $this->getQueueDriver() . '.timeout', 60);
-    }
-
-    protected function getMaxTries()
-    {
-        return config('queue.connections.' . $this->getQueueDriver() . '.tries', 3);
-    }
-
-    protected function getFailedJobsTable()
-    {
-        return config('queue.failed.table', 'failed_jobs');
-    }
-
-    public function getFailedJobs($limit = 10)
-    {
-        return DB::table($this->getFailedJobsTable())
-            ->orderBy('failed_at', 'desc')
-            ->limit($limit)
-            ->get();
-    }
-
-    public function retryJob($id)
-    {
-        $failedJob = DB::table($this->getFailedJobsTable())->find($id);
-        
-        if (!$failedJob) {
+        try {
+            Queue::size();
+            return true;
+        } catch (\Exception $e) {
             return false;
         }
-
-        $job = unserialize($failedJob->payload);
-        
-        if (!$job) {
-            return false;
-        }
-
-        dispatch($job);
-        
-        DB::table($this->getFailedJobsTable())->where('id', $id)->delete();
-        
-        return true;
     }
 
-    public function deleteJob($id)
+    public function getPendingJobsCount(): int
     {
-        return DB::table($this->getFailedJobsTable())->where('id', $id)->delete();
+        try {
+            return Queue::size();
+        } catch (\Exception $e) {
+            return 0;
+        }
+    }
+
+    public function getFailedJobsCount(): int
+    {
+        try {
+            return \DB::table('failed_jobs')->count();
+        } catch (\Exception $e) {
+            return 0;
+        }
+    }
+
+    public function getFailedJobs(int $limit = 10): array
+    {
+        try {
+            return \DB::table('failed_jobs')
+                ->orderBy('failed_at', 'desc')
+                ->limit($limit)
+                ->get()
+                ->toArray();
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
+    public function retryJob(int $id): bool
+    {
+        try {
+            $job = \DB::table('failed_jobs')->find($id);
+            if (!$job) {
+                return false;
+            }
+
+            \DB::table('failed_jobs')->where('id', $id)->delete();
+            \Queue::push(json_decode($job->payload, true));
+
+            return true;
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    public function deleteJob(int $id): bool
+    {
+        try {
+            return \DB::table('failed_jobs')->where('id', $id)->delete() > 0;
+        } catch (\Exception $e) {
+            return false;
+        }
     }
 }

@@ -4,6 +4,7 @@ namespace Aoux\SystemMonitor\Services;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Redis;
+use Illuminate\Support\Facades\Config;
 
 class CacheMonitor
 {
@@ -24,17 +25,16 @@ class CacheMonitor
         $this->showTtl = config('system-monitor.cache.show_ttl', true);
     }
 
-    public function getDriverInfo()
+    public function getDriverInfo(): array
     {
-        $driver = config('cache.default');
-        $config = config('cache.stores.' . $driver);
+        $driver = Config::get('cache.default');
+        $connection = Config::get('cache.stores.' . $driver);
 
         return [
-            'driver' => $driver,
-            'config' => $config,
-            'status' => $this->checkConnection($driver),
-            'keys_count' => $this->getKeysCount(),
-            'memory_usage' => $this->getMemoryUsage()
+            'name' => $driver,
+            'connection' => $connection['connection'] ?? null,
+            'prefix' => $connection['prefix'] ?? '',
+            'ttl' => $connection['ttl'] ?? 60
         ];
     }
 
@@ -47,83 +47,105 @@ class CacheMonitor
         }
     }
 
-    public function getMemoryUsage()
+    public function getMemoryUsage(): string
     {
         try {
-            $info = $this->redis->info('memory');
-            return $this->formatBytes($info['used_memory']);
+            $keys = $this->getCacheKeys();
+            $totalSize = 0;
+
+            foreach ($keys as $key) {
+                $value = Cache::get($key);
+                if ($value !== null) {
+                    $totalSize += strlen(serialize($value));
+                }
+            }
+
+            return $this->formatBytes($totalSize);
         } catch (\Exception $e) {
             return '0 B';
         }
     }
 
-    public function getStatus()
+    public function getStatus(): array
     {
         return [
-            'driver' => $this->driver,
-            'keys' => $this->getCacheKeys(),
-            'stats' => $this->getCacheStats()
+            'driver' => $this->getDriverInfo(),
+            'status' => $this->checkConnection(),
+            'total_keys' => $this->getTotalKeys(),
+            'memory_usage' => $this->getMemoryUsage()
         ];
     }
 
-    protected function getCacheKeys()
+    public function getCacheKeys(): array
     {
-        $keys = [];
-
-        if ($this->driver === 'redis') {
-            $redis = Redis::connection();
-            $keys = $redis->keys('*');
-            $keys = array_slice($keys, 0, $this->maxKeys);
+        try {
+            $driver = Config::get('cache.default');
             
-            return collect($keys)->map(function ($key) use ($redis) {
-                $data = [
-                    'key' => $key,
-                    'value' => $this->showValues ? $redis->get($key) : null,
-                    'ttl' => $this->showTtl ? $redis->ttl($key) : null
-                ];
-                return $data;
-            })->toArray();
-        }
-
-        // Diğer cache sürücüleri için
-        if (method_exists(Cache::getStore(), 'getAll')) {
-            $keys = Cache::getStore()->getAll();
-            $keys = array_slice($keys, 0, $this->maxKeys);
+            if ($driver === 'redis') {
+                return $this->getRedisKeys();
+            } elseif ($driver === 'memcached') {
+                return $this->getMemcachedKeys();
+            } elseif ($driver === 'file') {
+                return $this->getFileKeys();
+            }
             
-            return collect($keys)->map(function ($value, $key) {
-                $data = [
-                    'key' => $key,
-                    'value' => $this->showValues ? $value : null,
-                    'ttl' => $this->showTtl ? Cache::getStore()->getTimeToLive($key) : null
-                ];
-                return $data;
-            })->toArray();
+            return [];
+        } catch (\Exception $e) {
+            return [];
         }
-
-        return [];
     }
 
-    protected function getCacheStats()
+    protected function getRedisKeys(): array
     {
-        $stats = [
-            'driver' => $this->driver,
-            'prefix' => config('cache.prefix'),
-            'default_ttl' => config('cache.ttl', 60),
-        ];
-
-        if ($this->driver === 'redis') {
-            $redis = Redis::connection();
-            $info = $redis->info();
-            
-            $stats = array_merge($stats, [
-                'used_memory' => $info['used_memory_human'] ?? null,
-                'connected_clients' => $info['connected_clients'] ?? null,
-                'total_keys' => count($redis->keys('*')),
-                'uptime' => $info['uptime_in_seconds'] ?? null,
-            ]);
+        try {
+            $redis = Cache::getRedis();
+            $keys = $redis->keys(Cache::getPrefix() . '*');
+            return array_map(function($key) {
+                return str_replace(Cache::getPrefix(), '', $key);
+            }, $keys);
+        } catch (\Exception $e) {
+            return [];
         }
+    }
 
-        return $stats;
+    protected function getMemcachedKeys(): array
+    {
+        try {
+            $memcached = Cache::getMemcached();
+            $keys = [];
+            $allKeys = $memcached->getAllKeys();
+            
+            foreach ($allKeys as $key) {
+                if (strpos($key, Cache::getPrefix()) === 0) {
+                    $keys[] = str_replace(Cache::getPrefix(), '', $key);
+                }
+            }
+            
+            return $keys;
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
+    protected function getFileKeys(): array
+    {
+        try {
+            $path = Config::get('cache.stores.file.path');
+            $keys = [];
+            
+            if (is_dir($path)) {
+                $files = glob($path . '/*');
+                foreach ($files as $file) {
+                    if (is_file($file)) {
+                        $keys[] = basename($file);
+                    }
+                }
+            }
+            
+            return $keys;
+        } catch (\Exception $e) {
+            return [];
+        }
     }
 
     public function deleteKey($key)
@@ -136,23 +158,33 @@ class CacheMonitor
         return Cache::flush();
     }
 
-    protected function formatBytes($bytes)
+    protected function formatBytes(int $bytes): string
     {
         $units = ['B', 'KB', 'MB', 'GB', 'TB'];
         $bytes = max($bytes, 0);
         $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
         $pow = min($pow, count($units) - 1);
         $bytes /= pow(1024, $pow);
+        
         return round($bytes, 2) . ' ' . $units[$pow];
     }
 
-    protected function checkConnection($driver)
+    public function checkConnection(): bool
     {
         try {
-            $this->app['cache']->store($driver)->put('test', 'test', 1);
-            return true;
+            Cache::put('test_connection', true, 1);
+            return Cache::get('test_connection') === true;
         } catch (\Exception $e) {
             return false;
+        }
+    }
+
+    public function getTotalKeys(): int
+    {
+        try {
+            return count($this->getCacheKeys());
+        } catch (\Exception $e) {
+            return 0;
         }
     }
 }
