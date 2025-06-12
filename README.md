@@ -79,7 +79,7 @@ php artisan system:monitor
 
 ## Güvenlik
 
-Güvenlik sorunlarını bildirmek için: mertulkusmulku@gmail.com
+Güvenlik sorunlarını bildirmek için: mertsmulku@gmail.com
 
 ## Lisans
 
