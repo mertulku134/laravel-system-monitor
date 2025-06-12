@@ -3,13 +3,14 @@
   "description": "Advanced system monitoring package for Laravel applications",
   "type": "library",
   "license": "MIT",
+  "version": "0.0.1",
   "authors": [
     {
       "name": "Mert Ülkü",
       "email": "mertsmulku@gmail.com"
     }
   ],
-  "homepage": "https://github.com/KULLANICI_ADINIZ/system-monitor",
+  "homepage": "https://github.com/mertulku134/laravel-system-monitor",
   "keywords": [
     "laravel",
     "monitor",
@@ -44,7 +45,7 @@
       ]
     }
   },
-  "minimum-stability": "dev",
+  "minimum-stability": "stable",
   "prefer-stable": true,
   "scripts": {
     "test": "vendor/bin/phpunit"
